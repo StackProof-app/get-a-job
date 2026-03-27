@@ -1,0 +1,14 @@
+{
+  "name": "gaj",
+  "display_name": "GAJ - Get A Job",
+  "description": "Manage your entire job search from Claude Code. Pipeline tracking, detective research, recruiter responses, cover letters, salary negotiation, and correspondence history.",
+  "version": "1.0.0",
+  "skills": [
+    {
+      "name": "gaj",
+      "path": "SKILL.md",
+      "description": "Job search pipeline with detective research, recruiter communication, and salary negotiation"
+    }
+  ],
+  "sub_skills_dir": "skills"
+}

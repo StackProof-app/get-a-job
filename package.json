@@ -1,0 +1,35 @@
+{
+  "name": "gaj",
+  "version": "1.0.0",
+  "description": "A unified Claude Code skill for engineers managing their job search",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TBD-ORG/GAJ.git"
+  },
+  "homepage": "https://stackproof.app",
+  "keywords": [
+    "claude-code",
+    "skill",
+    "job-search",
+    "pipeline",
+    "recruiter",
+    "negotiation",
+    "cover-letter",
+    "salary",
+    "triage"
+  ],
+  "dependencies": {
+    "better-sqlite3": "^11.0.0",
+    "googleapis": "^144.0.0",
+    "yaml": "^2.4.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.0",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.5.0"
+  }
+}

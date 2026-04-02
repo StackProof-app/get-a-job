@@ -17,8 +17,12 @@ Display this exactly:
 GAJ — Job Search Pipeline
 ══════════════════════════
 
+Run your entire job search from here. Every recruiter and company
+gets investigated before you respond to anything.
+
 Get started:
   /gaj                  Pipeline dashboard (or first-run setup)
+  /gaj:profile          View or update your search profile
   Fill in ~/gaj/context/about-me.md with your targets, salary floor, and achievements
 
 Pipeline commands:
@@ -26,7 +30,7 @@ Pipeline commands:
   /gaj:list             List/filter pipeline items
   /gaj:status           Update a job's status
   /gaj:search           Search by company, title, or keyword
-  /gaj:stats            Pipeline statistics and breakdown
+  /gaj:stats            Pipeline statistics
 
 Generation commands:
   /gaj:cover-letter     Generate a Hook/Proof/Close cover letter

@@ -1,7 +1,7 @@
 {
   "name": "gaj",
   "version": "1.0.0",
-  "description": "A unified Claude Code skill for engineers managing their job search",
+  "description": "Run your entire job search from Claude Code. Investigates every opportunity before you make a move.",
   "license": "MIT",
   "type": "module",
   "repository": {

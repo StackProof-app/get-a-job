@@ -23,6 +23,7 @@ A unified Claude Code skill for engineers managing their job search. Pipeline tr
 | Command | Purpose |
 |---------|---------|
 | `/gaj` | Pipeline summary dashboard |
+| `/gaj:profile` | View or update search profile |
 | `/gaj:add` | Add a job to the pipeline |
 | `/gaj:list` | List/filter pipeline items |
 | `/gaj:status` | Update job status |

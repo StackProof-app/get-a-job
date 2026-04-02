@@ -2,15 +2,19 @@
   <img src="assets/banner.png" alt="GAJ - Get A Job" width="400">
 </p>
 
-A Claude Code skill that runs detective research on every job opportunity before it hits your pipeline.
+<p align="center">by <a href="https://stackproof.app">StackProof</a></p>
+
+Run your entire job search from the terminal. Investigates everything before you make a move.
+
+Designed for Claude Code. Works with 30+ LLM environments.
 
 ## What this is
 
-GAJ manages your job search from the terminal. When you add a job or respond to a recruiter, it launches parallel research agents that investigate the company, verify compensation against market data, check the recruiter's reputation, and identify unnamed clients from staffing firms. A recruiter says "leading global supplier of electronic components" and GAJ cross-references the industry, tech stack, geography, and salary band to tell you it's probably Avnet.
+A recruiter messages you about a "Senior AI role at a leading enterprise software company." You don't know if the recruiter is legitimate, who the actual client is, or whether the comp is real. GAJ figures it out. It runs parallel research agents that check the recruiter's track record, cross-reference the job description against known companies to identify the unnamed client, and verify compensation against market data. You get a detective report before you write a single word back.
 
-The research stays secret. Outbound messages never reference what GAJ found. You know who the client is, what the market pays, and whether the recruiter is legitimate. They don't know you know.
+Then it drafts your response. Based on the research, GAJ classifies your interest level and generates a calibrated reply: engage and ask the right questions, decline but keep the recruiter warm for future roles, or pass entirely. Every message, inbound and outbound, is stored with full context so nothing falls through the cracks.
 
-Beyond detective work: pipeline tracking across 10 sub-commands, cover letter generation, salary negotiation with the Ackerman model, correspondence history, and batch triage for job alert digests. All data lives on your machine in SQLite. No external APIs, no server costs.
+Beyond recruiter correspondence: cover letter generation in a Hook/Proof/Close format that doesn't read like AI wrote it. Salary negotiation using the Ackerman model with market data. Batch triage that scores a pile of LinkedIn alerts and surfaces the three worth your time. Pipeline tracking across every stage from first contact to signed offer. All data stays on your machine in SQLite.
 
 ## Install
 
@@ -30,23 +34,31 @@ First time you run `/gaj`, setup runs automatically:
 
 Fill in `about-me.md` with your target roles, salary floor, and key achievements.
 
-## Commands
+## When a recruiter reaches out
 
-| Command | What it does |
-|---------|-------------|
-| `/gaj` | Pipeline dashboard |
-| `/gaj:add` | Add a job (runs detective research first) |
-| `/gaj:list` | List and filter pipeline items |
-| `/gaj:status` | Update a job's status |
-| `/gaj:search` | Search by company, title, or keyword |
-| `/gaj:stats` | Pipeline statistics |
-| `/gaj:cover-letter` | Generate a Hook/Proof/Close cover letter |
-| `/gaj:respond` | Assess interest, research the opportunity, draft a response |
-| `/gaj:negotiate` | Ackerman-based salary negotiation with market data |
-| `/gaj:sync` | Export pipeline to Google Sheets |
-| `/gaj:triage` | Batch-score and filter job alert digests |
+`/gaj:respond` — Researches the recruiter, the company (or deduces the unnamed client), checks comp against market data, assesses your interest on 5 criteria, and drafts a calibrated response. Stores all correspondence.
 
-Natural language works too. "Add Nexus senior engineer" routes to `gaj:add`. "What's in my pipeline?" routes to `gaj:list`.
+## When you find a job worth tracking
+
+`/gaj:add` — Adds the job and runs detective research before it hits your pipeline. Company intel, recruiter verification, comp reality check.
+
+`/gaj:cover-letter` — Generates a Hook/Proof/Close cover letter matched to the role. Tone controls for formal, conversational, or direct.
+
+## When your inbox is a wall of alerts
+
+`/gaj:triage` — Scores a batch of job listings on role fit, stack match, company quality, comp signal, and strategic value. Surfaces the signal, filters the noise.
+
+## When you get an offer
+
+`/gaj:negotiate` — Ackerman model negotiation with market data lookup. Tracks concession steps, flags walk-away signals, handles W-2 vs 1099.
+
+## Pipeline management
+
+`/gaj:list` `/gaj:status` `/gaj:search` `/gaj:stats` `/gaj:sync`
+
+Track every opportunity from first contact to signed offer. Filter by status, search by company or keyword, export to Google Sheets.
+
+`/gaj` — Dashboard. `/gaj:profile` — Update your search profile. `/gaj:help` — Full command reference.
 
 ## Examples
 
@@ -141,7 +153,7 @@ Side tracks: `rejected`, `expired`, `filtered`
 
 ## Built by
 
-[StackProof](https://stackproof.app) builds tools for engineers who take their job search seriously. GAJ is the open-source foundation. StackProof adds recruiter intelligence, application tracking analytics, and a web interface.
+[StackProof](https://stackproof.app) securely scans and analyzes your GitHub repos, finds jobs worth your time from sources like Cursor, Greenhouse, and Y Combinator, then prepares you for interviews using evidence from your own code. GAJ is the open-source command line. StackProof is the full platform.
 
 ## License
 

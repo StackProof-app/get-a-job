@@ -2,13 +2,15 @@
 
 import { fileURLToPath } from 'url';
 import { dirname, join, resolve } from 'path';
-import { cpSync, mkdirSync, readdirSync, existsSync } from 'fs';
+import { cpSync, mkdirSync, readdirSync, existsSync, readFileSync } from 'fs';
 import { execFileSync } from 'child_process';
 import { homedir } from 'os';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const pkgRoot = resolve(__dirname, '..');
+
+const pkg = JSON.parse(readFileSync(join(pkgRoot, 'package.json'), 'utf8'));
 
 const claudeDir = join(homedir(), '.claude');
 const skillDir = join(claudeDir, 'skills', 'gaj');
@@ -27,7 +29,7 @@ console.log(BEIGE + '  ██║   ██║██╔══██║██   █
 console.log(BEIGE + '  ╚██████╔╝██║  ██║╚█████╔╝' + RESET);
 console.log(BEIGE + '   ╚═════╝ ╚═╝  ╚═╝ ╚════╝' + RESET);
 console.log('');
-console.log(BEIGE + '  Get A Job' + RESET + '  v1.0.0');
+console.log(BEIGE + '  Get A Job' + RESET + `  v${pkg.version}`);
 console.log('  Run your job search from Claude Code. By StackProof.app');
 console.log('');
 
@@ -70,6 +72,7 @@ const scriptsSource = join(pkgRoot, 'scripts');
 const scriptsDest = join(skillDir, 'scripts');
 mkdirSync(scriptsDest, { recursive: true });
 for (const file of readdirSync(scriptsSource)) {
+  if (!file.endsWith('.ts')) continue;
   cpSync(join(scriptsSource, file), join(scriptsDest, file));
 }
 
@@ -81,14 +84,16 @@ console.log(GREEN + '  ✓' + RESET + ' Installed skills/gaj');
 console.log(GREEN + '  ✓' + RESET + ' Installed commands/gaj');
 
 // Install production dependencies
+const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 try {
-  execFileSync('npm', ['install', '--production', '--silent'], {
+  execFileSync(npm, ['install', '--production', '--silent'], {
     cwd: skillDir,
     stdio: 'pipe',
   });
   console.log(GREEN + '  ✓' + RESET + ' Installed dependencies');
 } catch (err) {
   console.error('  ✗ Failed to install dependencies:', err.message);
+  if (err.stderr) console.error(err.stderr.toString());
   process.exit(1);
 }
 

@@ -21,7 +21,7 @@ Beyond recruiter correspondence: cover letter generation in a Hook/Proof/Close f
 Requires [Claude Code](https://claude.ai/claude-code).
 
 ```bash
-npx skills add stackproof/GAJ
+npx skills add stackproof-app/GAJ
 ```
 
 ## Quick start

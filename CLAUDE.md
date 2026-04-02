@@ -8,7 +8,7 @@ A unified Claude Code skill for engineers managing their job search. Pipeline tr
 - **Database:** SQLite via better-sqlite3 at `~/gaj/gaj.db`
 - **Config:** YAML at `~/gaj/config.yaml`
 - **Pattern:** Like GSD (`gsd:command`) or GVB (`viral:command`). One install, multiple slash commands.
-- **Install:** `npx skills add stackproof/GAJ`
+- **Install:** `npx skills add stackproof-app/GAJ`
 
 ## Key constraints
 

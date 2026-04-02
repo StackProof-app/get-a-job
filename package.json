@@ -3,11 +3,10 @@
   "version": "1.0.0",
   "description": "A unified Claude Code skill for engineers managing their job search",
   "license": "MIT",
-  "private": true,
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/TBD-ORG/GAJ.git"
+    "url": "git+https://github.com/StackProof-app/GAJ.git"
   },
   "homepage": "https://stackproof.app",
   "keywords": [

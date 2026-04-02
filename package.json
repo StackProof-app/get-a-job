@@ -1,9 +1,21 @@
 {
-  "name": "gaj",
+  "name": "get-a-job",
   "version": "1.0.0",
   "description": "Run your entire job search from Claude Code. Investigates every opportunity before you make a move.",
   "license": "MIT",
   "type": "module",
+  "bin": {
+    "get-a-job": "bin/install.mjs"
+  },
+  "files": [
+    "bin",
+    "skills",
+    "commands",
+    "prompts",
+    "scripts",
+    "SKILL.md",
+    "tsconfig.json"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/StackProof-app/GAJ.git"

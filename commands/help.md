@@ -35,6 +35,7 @@ Pipeline commands:
 Generation commands:
   /gaj:cover-letter     Generate a Hook/Proof/Close cover letter
   /gaj:respond          Assess interest and draft a recruiter response
+  /gaj:sherlock         Deep investigation on a company, recruiter, or listing
   /gaj:negotiate        Ackerman-based salary negotiation guidance
 
 Workflow commands:

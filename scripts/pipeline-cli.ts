@@ -88,7 +88,8 @@ function updateField(id: string, field: string, value: string) {
   const allowedFields = [
     'status', 'company_name', 'job_title', 'salary_raw', 'source', 'url',
     'outcome', 'current_step', 'match_result', 'cover_letter',
-    'cover_letter_edited', 'cover_letter_doc_url', 'applied_via', 'research_notes'
+    'cover_letter_edited', 'cover_letter_doc_url', 'applied_via', 'research_notes',
+    'job_data'
   ];
   if (!allowedFields.includes(field)) {
     console.error(JSON.stringify({
@@ -258,6 +259,41 @@ function salaryLookup(role: string, level?: string, location?: string) {
   }, null, 2));
 }
 
+function getJob(idStr: string) {
+  const numericId = Number(idStr);
+  let row: Record<string, unknown> | undefined;
+
+  if (!isNaN(numericId)) {
+    row = db.prepare('SELECT * FROM jobs WHERE id = ?').get(numericId) as Record<string, unknown> | undefined;
+  } else {
+    row = db.prepare('SELECT * FROM jobs WHERE company_name LIKE ? LIMIT 1').get(`%${idStr}%`) as Record<string, unknown> | undefined;
+  }
+
+  if (!row) {
+    console.error(JSON.stringify({ error: `No job found matching '${idStr}'` }));
+    process.exit(1);
+  }
+
+  // Parse job_data from JSON string
+  let jobData = {};
+  try {
+    jobData = JSON.parse(row.job_data as string || '{}');
+  } catch { /* keep empty */ }
+
+  console.log(JSON.stringify({
+    id: row.id,
+    company: row.company_name,
+    role: row.job_title,
+    status: row.status,
+    source: row.source,
+    salary: row.salary_raw,
+    url: row.url,
+    job_data: jobData,
+    created_at: row.created_at,
+    updated_at: row.updated_at
+  }, null, 2));
+}
+
 switch (command) {
   case 'list':               list(args[0]); break;
   case 'add':                add(args[0]); break;
@@ -267,9 +303,10 @@ switch (command) {
   case 'stats':              stats(); break;
   case 'log-message':        logMessage(args[0]); break;
   case 'get-correspondence': getCorrespondence(args[0]); break;
+  case 'get-job':            getJob(args[0]); break;
   case 'salary-lookup':      salaryLookup(args[0], args[1], args[2]); break;
   default:
-    console.log('Usage: pipeline-cli.ts <list|add|update|status|search|stats|log-message|get-correspondence|salary-lookup> [args...]');
+    console.log('Usage: pipeline-cli.ts <list|add|update|status|search|stats|log-message|get-correspondence|get-job|salary-lookup> [args...]');
     process.exit(1);
 }
 

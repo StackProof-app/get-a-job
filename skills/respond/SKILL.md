@@ -53,27 +53,35 @@ Store the recruiter's message in the correspondence table:
 npx tsx scripts/pipeline-cli.ts log-message '{"job_id":<id>,"direction":"inbound","platform":"<linkedin|email>","sender_name":"<recruiter name>","message_text":"<their message>"}'
 ```
 
-### Step 4: Detective research (mandatory)
+### Step 4: Detective research (via sherlock)
 
-Before assessing interest or drafting any response, run deep investigative research
-using parallel subagents. This research directly determines pass-or-pursue decisions.
+Before assessing interest or drafting any response, run the sherlock investigation.
 
-**Launch these research threads in parallel:**
+**Check for existing findings:**
 
-1. **The recruiter**: Firm name, recruiter tenure, LinkedIn profile, Glassdoor reviews,
-   specialization, geographic footprint. Is this person legitimate and senior, or a
-   cold-calling junior recruiter?
+```bash
+npx tsx scripts/pipeline-cli.ts get-job <job-id>
+```
 
-2. **The company/client**: If named, research AI/tech investment, engineering culture,
-   tech stack, news, leadership, funding. If unnamed (staffing firm), cross-reference
-   JD clues (industry, stack, location, salary band, company descriptors) to identify
-   the likely client. Rank candidates with evidence.
+If `job_data.sherlock` exists and `investigated_at` is < 24 hours old, use the
+existing findings. Skip to Step 4b.
 
-3. **Compensation and market fit**: Compare stated comp to market rates and user's floor
-   from about-me.md. Check stack alignment.
+If no findings exist, run a full sherlock investigation using the process defined
+in @prompts/sherlock-system.md. Use these inputs:
+- Company name from the pipeline entry
+- Recruiter name from the inbound message
+- Any URL or JD text the user provided
 
-Present findings as a structured **detective report** with evidence tables.
-Store research in `job_data` via update if the pipeline entry already exists.
+Launch the 5 investigation dimensions as parallel subagents per the sherlock
+system prompt. Store findings:
+
+```bash
+npx tsx scripts/pipeline-cli.ts update <id> 'job_data' '<sherlock findings JSON>'
+```
+
+Present a condensed detective report to the user (sections: company profile,
+recruiter profile, red flags, green flags, compensation analysis). This is
+for the user's eyes only.
 
 **CRITICAL: The detective report is a secret weapon for the user only.** Never reveal
 research findings in any outbound communication. Outbound messages must reference ONLY

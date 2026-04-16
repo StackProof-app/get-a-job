@@ -1,24 +1,28 @@
 #!/usr/bin/env npx tsx
-// setup-db.ts — Initialize GAJ database at ~/gaj/gaj.db
+// setup-db.ts — Initialize GAJ database.
+// Resolves the DB path via env → ~/gaj/config.yaml → ~/gaj/gaj.db.
 // Creates tables (jobs, correspondence, salary_data) and seeds salary data.
-// Idempotent: safe to run multiple times.
+// Idempotent: safe to run multiple times. Adds missing apply columns via ALTER.
 
 import Database from 'better-sqlite3';
-import { mkdirSync, existsSync } from 'fs';
-import { join } from 'path';
-import { homedir } from 'os';
+import { resolveDbPath, ensureDbDir } from './lib/db-path.js';
 
-const GAJ_DIR = join(homedir(), 'gaj');
-const DB_PATH = join(GAJ_DIR, 'gaj.db');
-
-// Ensure ~/gaj/ exists
-if (!existsSync(GAJ_DIR)) {
-  mkdirSync(GAJ_DIR, { recursive: true });
-  console.log(`Created directory: ${GAJ_DIR}`);
-}
+const DB_PATH = resolveDbPath();
+ensureDbDir(DB_PATH);
 
 const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
+
+// Columns that newer `/gaj:apply` code depends on. Fresh installs get them via
+// CREATE TABLE below; legacy DBs get them via the migration block below that.
+const APPLY_COLUMNS: { name: string; type: string }[] = [
+  { name: 'apply_url',                 type: 'TEXT' },
+  { name: 'form_screenshot_path',      type: 'TEXT' },
+  { name: 'submission_screenshot_path', type: 'TEXT' },
+  { name: 'error_step',                type: 'TEXT' },
+  { name: 'error_message',             type: 'TEXT' },
+  { name: 'error_at',                  type: 'TEXT' },
+];
 
 const setup = db.transaction(() => {
   // Jobs table
@@ -44,10 +48,35 @@ const setup = db.transaction(() => {
       normalized_url TEXT,
       dedup_key TEXT,
       job_data TEXT DEFAULT '{}',
+      apply_url TEXT,
+      form_screenshot_path TEXT,
+      submission_screenshot_path TEXT,
+      error_step TEXT,
+      error_message TEXT,
+      error_at TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // Migration: add apply columns to pre-existing DBs that predate them.
+  // Production DB already has these and is a no-op. Fresh installs above
+  // already have them from CREATE TABLE and are also a no-op.
+  const existingColumns = new Set(
+    (db.prepare('PRAGMA table_info(jobs)').all() as { name: string }[]).map(c => c.name)
+  );
+  const added: string[] = [];
+  for (const col of APPLY_COLUMNS) {
+    if (!existingColumns.has(col.name)) {
+      db.exec(`ALTER TABLE jobs ADD COLUMN ${col.name} ${col.type}`);
+      added.push(col.name);
+    }
+  }
+  if (added.length > 0) {
+    console.log(`Migration: added ${added.length} apply column(s): ${added.join(', ')}`);
+  } else {
+    console.log('Migration: schema current (no apply columns to add)');
+  }
 
   // Correspondence table
   db.exec(`

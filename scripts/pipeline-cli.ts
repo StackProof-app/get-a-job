@@ -15,14 +15,13 @@
 
 import Database from 'better-sqlite3';
 import { existsSync } from 'fs';
-import { join } from 'path';
-import { homedir } from 'os';
+import { resolveDbPath } from './lib/db-path.js';
 
-const DB_PATH = join(homedir(), 'gaj', 'gaj.db');
+const DB_PATH = resolveDbPath();
 
 if (!existsSync(DB_PATH)) {
   console.error(JSON.stringify({
-    error: 'Database not found. Run setup first: npx tsx scripts/setup-db.ts'
+    error: `Database not found at ${DB_PATH}. Run setup first: npx tsx scripts/setup-db.ts`
   }));
   process.exit(1);
 }
@@ -89,7 +88,8 @@ function updateField(id: string, field: string, value: string) {
     'status', 'company_name', 'job_title', 'salary_raw', 'source', 'url',
     'outcome', 'current_step', 'match_result', 'cover_letter',
     'cover_letter_edited', 'cover_letter_doc_url', 'applied_via', 'research_notes',
-    'job_data'
+    'apply_url', 'form_screenshot_path', 'submission_screenshot_path',
+    'error_step', 'error_message'
   ];
   if (!allowedFields.includes(field)) {
     console.error(JSON.stringify({
@@ -259,39 +259,126 @@ function salaryLookup(role: string, level?: string, location?: string) {
   }, null, 2));
 }
 
-function getJob(idStr: string) {
-  const numericId = Number(idStr);
-  let row: Record<string, unknown> | undefined;
+function applyQueue() {
+  const rows = db.prepare(
+    `SELECT id, company_name, job_title, apply_url, salary_raw, source, created_at
+     FROM jobs WHERE status = 'cover-letter-ready' ORDER BY created_at ASC`
+  ).all() as Record<string, unknown>[];
+  console.log(JSON.stringify({
+    count: rows.length,
+    jobs: rows.map(r => ({
+      id: r.id,
+      company: r.company_name,
+      role: r.job_title,
+      apply_url: r.apply_url,
+      salary: r.salary_raw,
+      source: r.source,
+      added: (r.created_at as string)?.split('T')[0]
+    }))
+  }, null, 2));
+}
 
-  if (!isNaN(numericId)) {
-    row = db.prepare('SELECT * FROM jobs WHERE id = ?').get(numericId) as Record<string, unknown> | undefined;
-  } else {
-    row = db.prepare('SELECT * FROM jobs WHERE company_name LIKE ? LIMIT 1').get(`%${idStr}%`) as Record<string, unknown> | undefined;
-  }
+function applyNext() {
+  const row = db.prepare(
+    `SELECT id, company_name, job_title, apply_url, cover_letter, cover_letter_edited,
+            research_notes, job_data, salary_raw, url, source, created_at
+     FROM jobs WHERE status = 'cover-letter-ready'
+     ORDER BY created_at ASC LIMIT 1`
+  ).get() as Record<string, unknown> | undefined;
 
   if (!row) {
-    console.error(JSON.stringify({ error: `No job found matching '${idStr}'` }));
+    console.log(JSON.stringify({ job: null }));
+    return;
+  }
+
+  let jobData: unknown = row.job_data;
+  if (typeof jobData === 'string' && jobData.length > 0) {
+    try { jobData = JSON.parse(jobData); } catch { /* keep raw string */ }
+  }
+
+  console.log(JSON.stringify({
+    job: {
+      id: row.id,
+      company_name: row.company_name,
+      job_title: row.job_title,
+      apply_url: row.apply_url,
+      cover_letter: row.cover_letter,
+      cover_letter_edited: row.cover_letter_edited,
+      research_notes: row.research_notes,
+      job_data: jobData,
+      salary_raw: row.salary_raw,
+      url: row.url,
+      source: row.source,
+      created_at: row.created_at
+    }
+  }, null, 2));
+}
+
+function applyFinalize(jsonStr: string | undefined) {
+  if (!jsonStr) {
+    console.error(JSON.stringify({ error: 'apply-finalize requires JSON payload: {"id":"...","submission_screenshot_path":"..."}' }));
+    process.exit(1);
+  }
+  const data = JSON.parse(jsonStr);
+  if (!data.id || !data.submission_screenshot_path) {
+    console.error(JSON.stringify({ error: 'Required fields: id, submission_screenshot_path' }));
     process.exit(1);
   }
 
-  // Parse job_data from JSON string
-  let jobData = {};
-  try {
-    jobData = JSON.parse(row.job_data as string || '{}');
-  } catch { /* keep empty */ }
+  const tx = db.transaction((id: string | number, screenshotPath: string) => {
+    const row = db.prepare('SELECT status FROM jobs WHERE id = ?').get(id) as { status: string } | undefined;
+    if (!row) {
+      throw new Error(`no job with id ${id}`);
+    }
+    if (row.status !== 'cover-letter-ready') {
+      throw new Error(`job ${id} not in cover-letter-ready (got: ${row.status})`);
+    }
+    db.prepare(
+      `UPDATE jobs
+       SET status = 'applied',
+           submission_screenshot_path = ?,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`
+    ).run(screenshotPath, id);
+  });
 
-  console.log(JSON.stringify({
-    id: row.id,
-    company: row.company_name,
-    role: row.job_title,
-    status: row.status,
-    source: row.source,
-    salary: row.salary_raw,
-    url: row.url,
-    job_data: jobData,
-    created_at: row.created_at,
-    updated_at: row.updated_at
-  }, null, 2));
+  try {
+    tx(data.id, data.submission_screenshot_path);
+  } catch (err) {
+    console.error(JSON.stringify({ error: (err as Error).message }));
+    process.exit(1);
+  }
+
+  console.log(JSON.stringify({ finalized: data.id, status: 'applied' }));
+}
+
+function applyError(jsonStr: string | undefined) {
+  if (!jsonStr) {
+    console.error(JSON.stringify({ error: 'apply-error requires JSON payload: {"id":"...","error_step":"...","error_message":"..."}' }));
+    process.exit(1);
+  }
+  const data = JSON.parse(jsonStr);
+  if (!data.id || !data.error_step || !data.error_message) {
+    console.error(JSON.stringify({ error: 'Required fields: id, error_step, error_message' }));
+    process.exit(1);
+  }
+
+  const existing = db.prepare('SELECT id FROM jobs WHERE id = ?').get(data.id) as { id: string | number } | undefined;
+  if (!existing) {
+    console.error(JSON.stringify({ error: `no job with id ${data.id}` }));
+    process.exit(1);
+  }
+
+  db.prepare(
+    `UPDATE jobs
+     SET error_step = ?,
+         error_message = ?,
+         error_at = CURRENT_TIMESTAMP,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = ?`
+  ).run(data.error_step, data.error_message, data.id);
+
+  console.log(JSON.stringify({ error_logged: data.id, error_step: data.error_step }));
 }
 
 switch (command) {
@@ -303,10 +390,13 @@ switch (command) {
   case 'stats':              stats(); break;
   case 'log-message':        logMessage(args[0]); break;
   case 'get-correspondence': getCorrespondence(args[0]); break;
-  case 'get-job':            getJob(args[0]); break;
   case 'salary-lookup':      salaryLookup(args[0], args[1], args[2]); break;
+  case 'apply-queue':        applyQueue(); break;
+  case 'apply-next':         applyNext(); break;
+  case 'apply-finalize':     applyFinalize(args[0]); break;
+  case 'apply-error':        applyError(args[0]); break;
   default:
-    console.log('Usage: pipeline-cli.ts <list|add|update|status|search|stats|log-message|get-correspondence|get-job|salary-lookup> [args...]');
+    console.log('Usage: pipeline-cli.ts <list|add|update|status|search|stats|log-message|get-correspondence|salary-lookup|apply-queue|apply-next|apply-finalize|apply-error> [args...]');
     process.exit(1);
 }
 

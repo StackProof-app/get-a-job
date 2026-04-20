@@ -85,6 +85,7 @@ def _dry_run(job_id: str, preview_url: str | None) -> int:
 def _run(job_id: str) -> int:
     from . import cli_shim
     from .adapter import JobRef
+    from .adapters.ashby import AshbyAdapter
     from .adapters.generic_llm import GenericLLMAdapter
     from .adapters.greenhouse import GreenhouseAdapter
     from .fingerprint import detect
@@ -112,7 +113,11 @@ def _run(job_id: str) -> int:
         return 1
 
     adapter_key = detect(url)
-    registry = {"greenhouse": GreenhouseAdapter(), "generic": GenericLLMAdapter()}
+    registry = {
+        "greenhouse": GreenhouseAdapter(),
+        "ashby": AshbyAdapter(),
+        "generic": GenericLLMAdapter(),
+    }
     adapter = registry.get(adapter_key, registry["generic"])
 
     profile = load_profile(resolve_profile_path())

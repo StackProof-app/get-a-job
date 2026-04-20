@@ -86,6 +86,7 @@ def _run(job_id: str) -> int:
     from . import cli_shim
     from .adapter import JobRef
     from .adapters.generic_llm import GenericLLMAdapter
+    from .adapters.greenhouse import GreenhouseAdapter
     from .fingerprint import detect
     from .profile import load_profile, resolve_profile_path
 
@@ -111,7 +112,7 @@ def _run(job_id: str) -> int:
         return 1
 
     adapter_key = detect(url)
-    registry = {"generic": GenericLLMAdapter()}
+    registry = {"greenhouse": GreenhouseAdapter(), "generic": GenericLLMAdapter()}
     adapter = registry.get(adapter_key, registry["generic"])
 
     profile = load_profile(resolve_profile_path())

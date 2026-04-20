@@ -9,3 +9,9 @@ dist/
 .DS_Store
 .paul/
 docs/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+scripts/apply/*.egg-info/

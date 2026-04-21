@@ -88,6 +88,7 @@ def _run(job_id: str) -> int:
     from .adapters.ashby import AshbyAdapter
     from .adapters.generic_llm import GenericLLMAdapter
     from .adapters.greenhouse import GreenhouseAdapter
+    from .adapters.lever import LeverAdapter
     from .fingerprint import detect
     from .profile import load_profile, resolve_profile_path
 
@@ -116,6 +117,7 @@ def _run(job_id: str) -> int:
     registry = {
         "greenhouse": GreenhouseAdapter(),
         "ashby": AshbyAdapter(),
+        "lever": LeverAdapter(),
         "generic": GenericLLMAdapter(),
     }
     adapter = registry.get(adapter_key, registry["generic"])

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Acme Labs: Apply (Lever shape)</title>
+</head>
+<body>
+  <main>
+    <h1>Software Engineer application</h1>
+    <form id="lever-application-form" class="application-form">
+
+      <div>
+        <label>Resume/CV
+          <input id="resume-upload-input" name="resume" type="file" data-qa="input-resume" accept="application/pdf" required>
+        </label>
+      </div>
+
+      <div>
+        <label>Full name
+          <input name="name" type="text" data-qa="name-input" required>
+        </label>
+      </div>
+
+      <div>
+        <label>Email
+          <input name="email" type="email" data-qa="email-input" required>
+        </label>
+      </div>
+
+      <div>
+        <label>Phone
+          <input name="phone" type="text" data-qa="phone-input">
+        </label>
+      </div>
+
+      <div>
+        <label>Current company
+          <input name="org" type="text" data-qa="org-input">
+        </label>
+      </div>
+
+      <div>
+        <label>LinkedIn URL
+          <input name="urls[LinkedIn]" type="text">
+        </label>
+      </div>
+
+      <div>
+        <label>GitHub URL
+          <input name="urls[GitHub]" type="text">
+        </label>
+      </div>
+
+      <div>
+        <label>Portfolio URL
+          <input name="urls[Portfolio]" type="text">
+        </label>
+      </div>
+
+      <div>
+        <input name="cards[7b840a00-bccd-4752-a3dd-2c887a15ffe2][baseTemplate]" type="hidden" value="">
+        <label>Are you authorized to work in the United States?
+          <textarea name="cards[7b840a00-bccd-4752-a3dd-2c887a15ffe2][field0]" rows="4" placeholder="Yes / No"></textarea>
+        </label>
+      </div>
+
+      <button type="submit">Submit application</button>
+    </form>
+  </main>
+</body>
+</html>

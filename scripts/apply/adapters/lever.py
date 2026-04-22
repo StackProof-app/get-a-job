@@ -22,12 +22,27 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from ..adapter import FillResult, JobRef
+from ..adapter import FillResult, JobRef, UploadResult
+from ..pdf_resolver import PDFBundle
 from ..profile import Profile
 
 
 SUBMIT_PATTERN = re.compile(r"submit|apply|send", re.IGNORECASE)
 BANNED_TYPES = {"submit", "button", "reset", "image", "hidden"}
+
+# Lever standard resume input (verified Metabase + AMT 2026-04-22,
+# Palantir/Whoop/FORM 2026-04-21). Cover letter on Lever is usually a
+# free-text or cards[UUID][field0] textarea; no stable selector exists
+# for a separate cover-letter file input, so the pattern chooser at the
+# gate routes to combined or text when cover letter matters.
+RESUME_SELECTORS: tuple[str, ...] = (
+    'input[type="file"]#resume-upload-input',
+    'input[type="file"][name="resume"]',
+)
+COVER_LETTER_SELECTORS: tuple[str, ...] = (
+    'input[type="file"][name="cover_letter"]',
+    'input[type="file"][name="coverLetter"]',
+)
 
 
 class LeverAdapter:
@@ -107,3 +122,44 @@ class LeverAdapter:
         except TypeError:
             page.screenshot(path=str(path))
         return str(path)
+
+    def upload_pdfs(self, page, bundle: PDFBundle, pattern: str) -> UploadResult:
+        """Attach PDFs to Lever file inputs per the chosen pattern.
+
+        Cover letter rarely exposed as a file input on Lever; the caller
+        handles paste-back via the text pattern in that case.
+        """
+        result = UploadResult()
+        if pattern not in ("separate", "combined", "text"):
+            result.error = f"unknown pattern: {pattern!r}"
+            return result
+
+        if pattern == "separate":
+            _set_first(page, RESUME_SELECTORS, bundle.resume, "resume", result)
+            _set_first(page, COVER_LETTER_SELECTORS, bundle.cover_letter, "cover_letter", result)
+        elif pattern == "combined":
+            _set_first(page, RESUME_SELECTORS, bundle.combined, "resume(combined)", result)
+        else:  # text
+            _set_first(page, RESUME_SELECTORS, bundle.resume, "resume", result)
+        return result
+
+
+def _set_first(page, selectors: tuple[str, ...], file_path, label: str, result: UploadResult) -> None:
+    """See greenhouse._set_first. Duplicated per Phase 11 decision: each
+    adapter independently auditable, cross-adapter coupling avoided.
+    """
+    if file_path is None:
+        result.skipped_uploads.append(f"{label}:no-file-in-bundle")
+        return
+    for selector in selectors:
+        try:
+            locator = page.locator(selector).first
+            if locator.count() == 0:
+                continue
+            locator.set_input_files(str(file_path))
+            result.uploaded_fields.append(label)
+            return
+        except Exception as exc:  # noqa: BLE001
+            result.skipped_uploads.append(f"{label}:selector-error:{selector}:{exc}")
+            return
+    result.skipped_uploads.append(f"{label}:no-input-on-page")

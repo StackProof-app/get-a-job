@@ -22,6 +22,7 @@ const APPLY_COLUMNS: { name: string; type: string }[] = [
   { name: 'error_step',                type: 'TEXT' },
   { name: 'error_message',             type: 'TEXT' },
   { name: 'error_at',                  type: 'TEXT' },
+  { name: 'slug',                      type: 'TEXT' },
 ];
 
 const setup = db.transaction(() => {
@@ -54,6 +55,7 @@ const setup = db.transaction(() => {
       error_step TEXT,
       error_message TEXT,
       error_at TEXT,
+      slug TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )

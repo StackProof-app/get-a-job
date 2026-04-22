@@ -25,6 +25,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from scripts.apply.adapter import JobRef  # noqa: E402
 from scripts.apply.adapters.ashby import AshbyAdapter  # noqa: E402
+from scripts.apply.pdf_resolver import PDFBundle  # noqa: E402
 from scripts.apply.profile import (  # noqa: E402
     Address,
     EeocVoluntary,
@@ -136,3 +137,73 @@ def test_ashby_adapter_fills_real_fixture(tmp_path: Path, guard_no_claude):
         job_dir = Path.home() / "gaj" / "applications" / job_id
         if job_dir.exists():
             shutil.rmtree(job_dir, ignore_errors=True)
+
+
+def _stub_pdf(path: Path) -> Path:
+    path.write_bytes(b"%PDF-1.4 stub\n%%EOF\n")
+    return path
+
+
+def test_ashby_upload_pdfs_combined_pattern(tmp_path: Path, guard_no_claude):
+    """Combined pattern: combined PDF into Ashby resume input."""
+    from scrapling.fetchers import DynamicFetcher
+
+    combined = _stub_pdf(tmp_path / "Christian-Martin-Acme-resume+coverletter.pdf")
+    bundle = PDFBundle(slug="acme", resume=None, cover_letter=None, combined=combined)
+    adapter = AshbyAdapter()
+
+    captured: dict = {"result": None, "error": None, "resume_count": None}
+
+    def page_action(page):
+        try:
+            captured["result"] = adapter.upload_pdfs(page, bundle, "combined")
+            captured["resume_count"] = (
+                page.locator('input[type="file"]#_systemfield_resume')
+                .first.evaluate("el => el.files.length")
+            )
+        except Exception as exc:  # noqa: BLE001
+            captured["error"] = repr(exc)
+        return page
+
+    DynamicFetcher.fetch(
+        f"file://{FIXTURE}", page_action=page_action, headless=True, network_idle=False
+    )
+
+    assert captured["error"] is None, captured["error"]
+    result = captured["result"]
+    assert result is not None
+    assert result.error is None
+    assert "resume(combined)" in result.uploaded_fields
+    assert captured["resume_count"] == 1
+
+
+def test_ashby_upload_pdfs_separate_records_cover_miss(tmp_path: Path, guard_no_claude):
+    """Ashby has no cover letter input; separate pattern uploads resume
+    and records the cover letter miss in skipped_uploads."""
+    from scrapling.fetchers import DynamicFetcher
+
+    resume = _stub_pdf(tmp_path / "Christian-Martin-Acme-resume.pdf")
+    cover = _stub_pdf(tmp_path / "Christian-Martin-Acme-cover-letter.pdf")
+    bundle = PDFBundle(slug="acme", resume=resume, cover_letter=cover, combined=None)
+    adapter = AshbyAdapter()
+
+    captured: dict = {"result": None, "error": None}
+
+    def page_action(page):
+        try:
+            captured["result"] = adapter.upload_pdfs(page, bundle, "separate")
+        except Exception as exc:  # noqa: BLE001
+            captured["error"] = repr(exc)
+        return page
+
+    DynamicFetcher.fetch(
+        f"file://{FIXTURE}", page_action=page_action, headless=True, network_idle=False
+    )
+
+    result = captured["result"]
+    assert result is not None
+    assert result.error is None
+    assert "resume" in result.uploaded_fields
+    assert any("cover_letter" in s and "no-input-on-page" in s for s in result.skipped_uploads), (
+        f"expected cover_letter:no-input-on-page miss; got {result.skipped_uploads}"
+    )

@@ -89,7 +89,7 @@ function updateField(id: string, field: string, value: string) {
     'outcome', 'current_step', 'match_result', 'cover_letter',
     'cover_letter_edited', 'cover_letter_doc_url', 'applied_via', 'research_notes',
     'apply_url', 'form_screenshot_path', 'submission_screenshot_path',
-    'error_step', 'error_message'
+    'error_step', 'error_message', 'slug'
   ];
   if (!allowedFields.includes(field)) {
     console.error(JSON.stringify({
@@ -261,7 +261,7 @@ function salaryLookup(role: string, level?: string, location?: string) {
 
 function applyQueue() {
   const rows = db.prepare(
-    `SELECT id, company_name, job_title, apply_url, salary_raw, source, created_at
+    `SELECT id, company_name, job_title, apply_url, salary_raw, source, slug, created_at
      FROM jobs WHERE status = 'cover-letter-ready' ORDER BY created_at ASC`
   ).all() as Record<string, unknown>[];
   console.log(JSON.stringify({
@@ -273,6 +273,7 @@ function applyQueue() {
       apply_url: r.apply_url,
       salary: r.salary_raw,
       source: r.source,
+      slug: r.slug,
       added: (r.created_at as string)?.split('T')[0]
     }))
   }, null, 2));
@@ -281,7 +282,7 @@ function applyQueue() {
 function applyNext() {
   const row = db.prepare(
     `SELECT id, company_name, job_title, apply_url, cover_letter, cover_letter_edited,
-            research_notes, job_data, salary_raw, url, source, created_at
+            research_notes, job_data, salary_raw, url, source, slug, created_at
      FROM jobs WHERE status = 'cover-letter-ready'
      ORDER BY created_at ASC LIMIT 1`
   ).get() as Record<string, unknown> | undefined;
@@ -309,6 +310,7 @@ function applyNext() {
       salary_raw: row.salary_raw,
       url: row.url,
       source: row.source,
+      slug: row.slug,
       created_at: row.created_at
     }
   }, null, 2));

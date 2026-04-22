@@ -29,6 +29,16 @@ class FillResult:
     error: str | None = None
 
 
+@dataclass
+class UploadResult:
+    """Returned by adapter.upload_pdfs(). Separate from FillResult because
+    upload fires after fill; callers accumulate both in the pre-upload gate.
+    """
+    uploaded_fields: list[str] = field(default_factory=list)
+    skipped_uploads: list[str] = field(default_factory=list)
+    error: str | None = None
+
+
 @runtime_checkable
 class ATSAdapter(Protocol):
     """Interface every ATS adapter implements.

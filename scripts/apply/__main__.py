@@ -3,6 +3,10 @@
 --dry-run resolves adapter + profile but does no browser or LLM work.
 Non-dry-run opens Scrapling DynamicFetcher, runs the matched adapter's
 fill() inside a page_action callback, and stops before any submit button.
+
+Phase 14: pre-upload gate runs after the job record and PDF bundle are
+resolved but before any file input is touched. The human picks the
+attachment pattern (separate / combined / text) or aborts.
 """
 
 from __future__ import annotations
@@ -10,6 +14,8 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from pathlib import Path
+from typing import Optional
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -35,6 +41,83 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Optional URL to preview field extraction against (dry-run only).",
     )
     return parser
+
+
+def _get_slug(job: dict | None) -> Optional[str]:
+    """Pull slug from a cli_shim job record; None if unset or record missing."""
+    if not job:
+        return None
+    raw = job.get("slug")
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    return None
+
+
+def _pre_upload_gate(
+    slug: str,
+    *,
+    input_fn=input,
+    output=sys.stdout,
+) -> tuple[Optional[str], Optional[object]]:
+    """Resolve PDFs for slug, display the gate, return (pattern, bundle).
+
+    Returns (None, None) when the human aborts or when no PDFs exist.
+    Any error is printed to output; the caller treats that as abort.
+    """
+    from .cover_letter import available_patterns, choose_pattern
+    from .pdf_resolver import PDFBundle, PDFBundleAmbiguous, PDFBundleMissing, resolve_pdfs
+
+    try:
+        bundle: PDFBundle = resolve_pdfs(slug)
+    except (PDFBundleMissing, PDFBundleAmbiguous) as exc:
+        print(f"Pre-upload gate: PDF resolution failed: {exc}", file=output)
+        return None, None
+
+    cover_html: Optional[Path] = None
+    candidate = Path(
+        "/Users/christianmartin/ANTIGRAVITY PROJECTS/OPERATION GETAJOB 2026/resume/cover-letters"
+    ) / f"{slug}.html"
+    if candidate.is_file():
+        cover_html = candidate
+
+    options = available_patterns(bundle, cover_html)
+    if not options:
+        print(
+            "Pre-upload gate: no attachment patterns available for this bundle. "
+            "Need resume+cover-letter PDFs, a combined PDF, or a resume PDF + cover HTML.",
+            file=output,
+        )
+        return None, None
+
+    print("", file=output)
+    print("=== Pre-upload gate ===", file=output)
+    print(f"Slug: {slug}", file=output)
+    print("Resolved PDFs:", file=output)
+    print(f"  resume:       {bundle.resume}", file=output)
+    print(f"  cover_letter: {bundle.cover_letter}", file=output)
+    print(f"  combined:     {bundle.combined}", file=output)
+    if cover_html is not None:
+        print(f"  cover_html:   {cover_html}", file=output)
+    print(f"Available patterns: {', '.join(options)}", file=output)
+    print("Type a pattern name, its number, or 'abort':", file=output, flush=True)
+
+    raw = input_fn().strip().lower()
+    if raw == "abort" or raw == "":
+        print("Pre-upload gate: aborted by user.", file=output)
+        return None, None
+
+    try:
+        pattern = choose_pattern(
+            bundle,
+            cover_html,
+            input_fn=lambda: raw,
+            output=output,
+        )
+    except ValueError as exc:
+        print(f"Pre-upload gate: invalid selection: {exc}", file=output)
+        return None, None
+
+    return pattern, bundle
 
 
 def _dry_run(job_id: str, preview_url: str | None) -> int:
@@ -68,6 +151,7 @@ def _dry_run(job_id: str, preview_url: str | None) -> int:
         profile_ok = False
         profile_error = str(exc)
 
+    slug = _get_slug(job)
     plan = {
         "adapter": adapter,
         "url": url,
@@ -76,9 +160,30 @@ def _dry_run(job_id: str, preview_url: str | None) -> int:
         "profile_ok": profile_ok,
         "profile_error": profile_error,
         "cli_error": cli_error,
+        "slug": slug,
         "note": "fingerprint+profile resolved, full run executes in non-dry-run mode",
     }
     print(json.dumps(plan, indent=2))
+
+    if slug:
+        pattern, bundle = _pre_upload_gate(slug)
+        if pattern is None:
+            return 0
+        print(
+            json.dumps(
+                {
+                    "would_upload": {
+                        "pattern": pattern,
+                        "resume": str(bundle.resume) if bundle.resume else None,
+                        "cover_letter": str(bundle.cover_letter) if bundle.cover_letter else None,
+                        "combined": str(bundle.combined) if bundle.combined else None,
+                    }
+                },
+                indent=2,
+            )
+        )
+    else:
+        print("(dry-run: slug unset on job record; pre-upload gate skipped)")
     return 0
 
 
@@ -113,6 +218,19 @@ def _run(job_id: str) -> int:
         print(f"job {job_id} has no apply_url", file=sys.stderr)
         return 1
 
+    slug = _get_slug(job_record)
+    if not slug:
+        print(
+            f"job {job_id} has no slug; set it via "
+            f"`npx tsx scripts/pipeline-cli.ts update {job_id} slug <slug>` first.",
+            file=sys.stderr,
+        )
+        return 1
+
+    pattern, bundle = _pre_upload_gate(slug)
+    if pattern is None:
+        return 0
+
     adapter_key = detect(url)
     registry = {
         "greenhouse": GreenhouseAdapter(),
@@ -136,13 +254,23 @@ def _run(job_id: str) -> int:
         print(f"scrapling import failed: {exc}", file=sys.stderr)
         return 1
 
-    captured: dict = {"result": None, "error": None}
+    captured: dict = {
+        "fill_result": None,
+        "upload_result": None,
+        "error": None,
+    }
 
     def page_action(page):
         try:
-            captured["result"] = adapter.fill(page, profile, job_ref)
+            captured["fill_result"] = adapter.fill(page, profile, job_ref)
         except Exception as exc:  # noqa: BLE001
             captured["error"] = f"adapter.fill crashed: {exc}"
+            return page
+        try:
+            if hasattr(adapter, "upload_pdfs"):
+                captured["upload_result"] = adapter.upload_pdfs(page, bundle, pattern)
+        except Exception as exc:  # noqa: BLE001
+            captured["error"] = f"adapter.upload_pdfs crashed: {exc}"
         return page
 
     try:
@@ -159,26 +287,31 @@ def _run(job_id: str) -> int:
             print(f"failed to log apply-error: {exc}", file=sys.stderr)
         return 1
 
-    result = captured["result"]
-    if result is None:
-        print("adapter returned no result", file=sys.stderr)
+    fill_result = captured["fill_result"]
+    upload_result = captured["upload_result"]
+    if fill_result is None:
+        print("adapter returned no fill result", file=sys.stderr)
         return 1
 
-    print(
-        json.dumps(
-            {
-                "adapter": adapter_key,
-                "filled_fields": result.filled_fields,
-                "skipped_fields": result.skipped_fields,
-                "screenshot_path": result.screenshot_path,
-                "error": result.error,
-            },
-            indent=2,
-        )
-    )
-    if result.error:
+    payload: dict = {
+        "adapter": adapter_key,
+        "pattern": pattern,
+        "filled_fields": fill_result.filled_fields,
+        "skipped_fields": fill_result.skipped_fields,
+        "screenshot_path": fill_result.screenshot_path,
+        "error": fill_result.error,
+    }
+    if upload_result is not None:
+        payload["uploaded_fields"] = upload_result.uploaded_fields
+        payload["skipped_uploads"] = upload_result.skipped_uploads
+        payload["upload_error"] = upload_result.error
+
+    print(json.dumps(payload, indent=2))
+    if fill_result.error or (upload_result and upload_result.error):
+        step = "fill" if fill_result.error else "upload"
+        msg = fill_result.error or (upload_result.error if upload_result else "")
         try:
-            cli_shim.apply_error(job_ref.id, "fill", result.error)
+            cli_shim.apply_error(job_ref.id, step, msg)
         except cli_shim.CliShimError as exc:
             print(f"failed to log apply-error: {exc}", file=sys.stderr)
         return 1
